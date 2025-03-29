@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Triqui By Isaac</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-database-compat.js"></script>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f0f0f0;
+      font-family: Arial, sans-serif;
+    }
+    
+    .contenedor-juego {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .tablero {
+      position: relative;
+      width: 300px;
+      height: 450px;
+      background-color: #fff;
+      border: 3px solid #333;
+      overflow: visible; /* Permitir que las fichas en los bordes se vean completas */
+    }
+    
+    .linea {
+      position: absolute;
+      background-color: #333;
+      z-index: 1;
+    }
+    
+    .horizontal {
+      width: 100%;
+      height: 4px;
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+    }
+    
+    .vertical {
+      width: 4px;
+      height: 100%;
+      left: 50%;
+      top: 0;
+      transform: translateX(-50%);
+    }
+    
+    .diagonal1 {
+      width: 4px;
+      height: 540px;
+      left: 50%;
+      top: 50%;
+      transform-origin: center;
+      transform: translate(-50%, -50%) rotate(34deg);
+    }
+    
+    .diagonal2 {
+      width: 4px;
+      height: 540px;
+      left: 50%;
+      top: 50%;
+      transform-origin: center;
+      transform: translate(-50%, -50%) rotate(-34deg);
+    }
+    
+    .jugadores {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 600px;
+    }
+    
+    .jugador {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .fichas-contenedor {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .ficha {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid #333;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: bold;
+      user-select: none;
+    }
+    
+    .ficha-seleccionada {
+      box-shadow: 0 0 0 3px gold;
+    }
+    
+    .jugador-1 .ficha {
+      background-color: #e74c3c;
+    }
+    
+    .jugador-2 .ficha {
+      background-color: #3498db;
+    }
+    
+    .selector-color {
+      margin-top: 5px;
+    }
+    
+    .posicion {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2;
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+    }
+    
+    .posicion:hover {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+    
+    .posicion-valida {
+      background-color: rgba(46, 204, 113, 0.2);
+    }
+    
+    .posicion-seleccionada {
+      background-color: rgba(241, 196, 15, 0.3);
+    }
+    
+    .sin-movimientos {
+      background-color: rgba(231, 76, 60, 0.2);
+    }
+    
+    .ficha-tablero {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: 2px solid #333;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: bold;
+      color: #fff;
+    }
+    
+    .mensaje {
+      height: 30px;
+      font-weight: bold;
+      color: #333;
+      text-align: center;
+    }
+    
+    .estado-juego {
+      margin-top: 10px;
+      text-align: center;
+      font-style: italic;
+    }
+    
+    .reiniciar {
+      padding: 8px 16px;
+      background-color: #333;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    
+    .reiniciar:hover {
+      background-color: #555;
+    }
+    
+    h1 {
+      margin-bottom: 10px;
+    }
+    
+    /* Estilos para la sección de conexión */
+    .conexion-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 20px;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background-color: #fff;
+    }
+    
+    .conexion-opciones {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .btn {
+      padding: 8px 16px;
+      background-color: #3498db;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    
+    .btn:hover {
+      background-color: #2980b9;
+    }
+    
+    .btn-copiar {
+      background-color: #2ecc71;
+    }
+    
+    .btn-copiar:hover {
+      background-color: #27ae60;
+    }
+    
+    .codigo-sala {
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+      padding: 5px 10px;
+      border: 1px dashed #aaa;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+    }
+    
+    .input-codigo {
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 16px;
+      width: 200px;
+      text-align: center;
+    }
+    
+    .espectador-badge {
+      background-color: #f39c12;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-left: 5px;
+    }
+    
+    .juego-container {
+      display: none;
+    }
+    
+    .conexion-mensaje {
+      color: #e74c3c;
+      font-weight: bold;
+      height: 20px;
+    }
+    
+    .jugador-info {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .jugador-online {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #2ecc71;
+    }
+    
+    .jugador-offline {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #e74c3c;
+    }
+  </style>
+</head>
+<body>
+  <div class="contenedor-juego">
+    <h1>Triqui By Isaac</h1>
+    
+    <!-- Contenedor de conexión -->
+    <div class="conexion-container" id="conexion-container">
+      <h2>Conectarse a una partida</h2>
+      
+      <div class="conexion-opciones" id="conexion-opciones">
+        <button class="btn" id="crear-sala">Crear sala</button>
+        <button class="btn" id="unirse-sala">Unirse a sala</button>
+      </div>
+      
+      <div id="sala-creada" style="display: none;">
+        <p>Comparte este código con tu oponente:</p>
+        <div class="codigo-sala" id="codigo-sala"></div>
+        <button class="btn btn-copiar" id="copiar-codigo">Copiar código</button>
+      </div>
+      
+      <div id="unirse-form" style="display: none;">
+        <p>Introduce el código de la sala:</p>
+        <input type="text" class="input-codigo" id="input-codigo" placeholder="Código de sala">
+        <button class="btn" id="btn-unirse">Unirse</button>
+      </div>
+      
+      <div class="conexion-mensaje" id="conexion-mensaje"></div>
+    </div>
+    
+    <!-- Contenedor del juego (oculto inicialmente) -->
+    <div class="juego-container" id="juego-container">
+      <div class="jugadores">
+        <div class="jugador jugador-2">
+          <div class="jugador-info">
+            <h2>Jugador 2</h2>
+            <div id="jugador-2-status" class="jugador-offline"></div>
+            <span id="jugador-2-espectador" class="espectador-badge" style="display: none;">Espectador</span>
+          </div>
+          <div class="fichas-contenedor" id="fichas-jugador-2">
+            <div class="ficha" data-id="2-1">1</div>
+            <div class="ficha" data-id="2-2">2</div>
+            <div class="ficha" data-id="2-3">3</div>
+          </div>
+          <input type="color" class="selector-color" id="color-jugador-2" value="#3498db">
+        </div>
+        
+        <div class="jugador jugador-1">
+          <div class="jugador-info">
+            <h2>Jugador 1</h2>
+            <div id="jugador-1-status" class="jugador-offline"></div>
+            <span id="jugador-1-espectador" class="espectador-badge" style="display: none;">Espectador</span>
+          </div>
+          <div class="fichas-contenedor" id="fichas-jugador-1">
+            <div class="ficha" data-id="1-1">1</div>
+            <div class="ficha" data-id="1-2">2</div>
+            <div class="ficha" data-id="1-3">3</div>
+          </div>
+          <input type="color" class="selector-color" id="color-jugador-1" value="#e74c3c">
+        </div>
+      </div>
+      
+      <div class="mensaje" id="mensaje">Esperando jugadores...</div>
+      <div class="estado-juego" id="estado-juego">Fase de colocación: coloca tus 3 fichas</div>
+      
+      <div class="tablero" id="tablero">
+        <div class="linea horizontal"></div>
+        <div class="linea vertical"></div>
+        <div class="linea diagonal1"></div>
+        <div class="linea diagonal2"></div>
+        
+        <!-- Posiciones para las fichas (9 posiciones) -->
+        <!-- Esquinas del cuadrado -->
+        <div class="posicion" style="left: 30px; top: 30px;" data-pos="0"></div>
+        <div class="posicion" style="left: 270px; top: 30px;" data-pos="1"></div>
+        <div class="posicion" style="left: 30px; top: 420px;" data-pos="2"></div>
+        <div class="posicion" style="left: 270px; top: 420px;" data-pos="3"></div>
+        
+        <!-- Puntas de las líneas que tocan los bordes -->
+        <div class="posicion" style="left: 150px; top: 30px;" data-pos="4"></div>
+        <div class="posicion" style="left: 30px; top: 225px;" data-pos="5"></div>
+        <div class="posicion" style="left: 270px; top: 225px;" data-pos="6"></div>
+        <div class="posicion" style="left: 150px; top: 420px;" data-pos="7"></div>
+        
+        <!-- Centro donde se cruzan todas las líneas -->
+        <div class="posicion" style="left: 150px; top: 225px;" data-pos="8"></div>
+      </div>
+      
+      <button class="reiniciar" id="reiniciar">Reiniciar Juego</button>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const firebaseConfig = {
+        apiKey: "AIzaSyAuFf8nPRINetfubh1MIEb9Dv4NuQvn6_A",
+        authDomain: "cloudflare-3098a.firebaseapp.com",
+        databaseURL: "https://cloudflare-3098a-default-rtdb.firebaseio.com/",
+        projectId: "cloudflare-3098a",
+        storageBucket: "cloudflare-3098a.firebasestorage.app",
+        messagingSenderId: "985997253869",
+        appId: "1:985997253869:web:ae57f49db56dec7d1d00e4"
+        };
+      
+      // Inicializar Firebase
+      firebase.initializeApp(firebaseConfig);
+      const database = firebase.database();
+      
+      // Variables para la conexión
+      let salaId = null;
+      let jugadorNum = null;
+      let miTurno = false;
+      let esEspectador = false;
+      
+      // Referencias al DOM para la conexión
+      const conexionContainer = document.getElementById('conexion-container');
+      const juegoContainer = document.getElementById('juego-container');
+      const crearSalaBtn = document.getElementById('crear-sala');
+      const unirseSalaBtn = document.getElementById('unirse-sala');
+      const salaCreada = document.getElementById('sala-creada');
+      const unirseForm = document.getElementById('unirse-form');
+      const codigoSala = document.getElementById('codigo-sala');
+      const inputCodigo = document.getElementById('input-codigo');
+      const btnUnirse = document.getElementById('btn-unirse');
+      const copiarCodigoBtn = document.getElementById('copiar-codigo');
+      const conexionMensaje = document.getElementById('conexion-mensaje');
+      const conexionOpciones = document.getElementById('conexion-opciones');
+      const jugador1Status = document.getElementById('jugador-1-status');
+      const jugador2Status = document.getElementById('jugador-2-status');
+      const jugador1Espectador = document.getElementById('jugador-1-espectador');
+      const jugador2Espectador = document.getElementById('jugador-2-espectador');
+      
+      // Variables del juego
+      let turnoJugador = 1;
+      let fichaSeleccionada = null;
+      let posicionSeleccionada = null;
+      let ganador = null;
+      let tablero = Array(9).fill(null);
+      let faseMover = false; // False = fase de colocación, True = fase de mover
+      let fichasColocadasJ1 = 0;
+      let fichasColocadasJ2 = 0;
+      
+      // Mapa de adyacencia (conectividad entre posiciones)
+      const mapaAdyacencia = {
+        0: [4, 5, 8], // Esquina superior izquierda
+        1: [4, 6, 8], // Esquina superior derecha
+        2: [5, 7, 8], // Esquina inferior izquierda
+        3: [6, 7, 8], // Esquina inferior derecha
+        4: [0, 1, 8], // Centro superior
+        5: [0, 2, 8], // Centro izquierdo
+        6: [1, 3, 8], // Centro derecho
+        7: [2, 3, 8], // Centro inferior
+        8: [0, 1, 2, 3, 4, 5, 6, 7] // Centro (conecta con todas)
+      };
+      
+      // Combinaciones ganadoras (posiciones del tablero)
+      const combinacionesGanadoras = [
+        [0, 4, 1],   // Horizontal superior
+        [5, 8, 6],   // Horizontal medio
+        [2, 7, 3],   // Horizontal inferior
+        [0, 5, 2],   // Vertical izquierda
+        [4, 8, 7],   // Vertical medio
+        [1, 6, 3],   // Vertical derecha
+        [0, 8, 3],   // Diagonal principal
+        [1, 8, 2]    // Diagonal secundaria
+      ];
+      
+      // Referencias a elementos del DOM del juego
+      const mensaje = document.getElementById('mensaje');
+      const estadoJuego = document.getElementById('estado-juego');
+      const fichasJugador1 = document.getElementById('fichas-jugador-1').querySelectorAll('.ficha');
+      const fichasJugador2 = document.getElementById('fichas-jugador-2').querySelectorAll('.ficha');
+      const colorJugador1 = document.getElementById('color-jugador-1');
+      const colorJugador2 = document.getElementById('color-jugador-2');
+      const btnReiniciar = document.getElementById('reiniciar');
+      const posicionesTablero = document.querySelectorAll('.posicion');
+      
+      // Generar ID único para la sala
+      function generarSalaId() {
+        return Math.random().toString(36).substring(2, 8).toUpperCase();
+      }
+      
+      // Crear una nueva sala
+      function crearSala() {
+        salaId = generarSalaId();
+        jugadorNum = 1;
+        miTurno = true;
+        esEspectador = false;
+        
+        // Crear sala en Firebase
+        database.ref('salas/' + salaId).set({
+          estado: {
+            turnoJugador: 1,
+            tablero: tablero,
+            faseMover: faseMover,
+            fichasColocadasJ1: fichasColocadasJ1,
+            fichasColocadasJ2: fichasColocadasJ2,
+            ganador: null
+          },
+          jugadores: {
+            1: {
+              conectado: true,
+              color: colorJugador1.value,
+              espectador: false
+            },
+            2: {
+              conectado: false,
+              color: colorJugador2.value,
+              espectador: false
+            }
+          }
+        });
+        
+        // Actualizar presencia al desconectar
+        database.ref('salas/' + salaId + '/jugadores/1/conectado').onDisconnect().set(false);
+        
+        // Mostrar código de sala
+        codigoSala.textContent = salaId;
+        conexionOpciones.style.display = 'none';
+        salaCreada.style.display = 'block';
+        
+        // Registrar listeners
+        conectarseASala();
+      }
+      
+      // Unirse a una sala existente
+      function unirseASala(codigo) {
+        salaId = codigo.toUpperCase();
+        
+        // Verificar si la sala existe
+        database.ref('salas/' + salaId).once('value', (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.val();
+            
+            if (data.jugadores[2] && data.jugadores[2].conectado) {
+              // Ambos jugadores ya están conectados, unirse como espectador
+              jugadorNum = 3; // Espectador
+              esEspectador = true;
+              miTurno = false;
+              
+              // Actualizar UI para espectador
+              mensaje.textContent = "Estás observando la partida";
+              
+              // Mostrar quien es espectador
+              if (data.jugadores[1].espectador) {
+                jugador1Espectador.style.display = 'inline';
+              }
+              if (data.jugadores[2].espectador) {
+                jugador2Espectador.style.display = 'inline';
+              }
+              
+              // Conectarse como espectador
+              conectarseASala();
+            } else {
+              // Unirse como jugador 2
+              jugadorNum = 2;
+              miTurno = data.estado.turnoJugador === 2;
+              esEspectador = false;
+              
+              // Actualizar estado en Firebase
+              database.ref('salas/' + salaId + '/jugadores/2').update({
+                conectado: true,
+                color: colorJugador2.value,
+                espectador: false
+              });
+              
+              // Actualizar presencia al desconectar
+              database.ref('salas/' + salaId + '/jugadores/2/conectado').onDisconnect().set(false);
+              
+              // Conectarse a la sala
+              conectarseASala();
+            }
+          } else {
+            // La sala no existe
+            conexionMensaje.textContent = "La sala no existe. Verifica el código.";
+          }
+        });
+      }
+      
+      // Conectarse a una sala y configurar listeners
+      function conectarseASala() {
+        // Ocultar contenedor de conexión y mostrar el juego
+        conexionContainer.style.display = 'none';
+        juegoContainer.style.display = 'block';
+        
+        // Listener para cambios en el estado del juego
+        database.ref('salas/' + salaId + '/estado').on('value', (snapshot) => {
+          const estadoJuego = snapshot.val();
+          actualizarEstadoJuego(estadoJuego);
+        });
+        
+        // Listener para cambios en los jugadores
+        database.ref('salas/' + salaId + '/jugadores').on('value', (snapshot) => {
+          const jugadores = snapshot.val();
+          actualizarEstadoJugadores(jugadores);
+        });
+        
+        // Configurar el juego
+        iniciarJuego();
+      }
+      
+      // Actualizar estado del juego desde Firebase
+      function actualizarEstadoJuego(estado) {
+        if (!estado) {
+          console.error("Estado del juego es undefined");
+          return;
+        }
+
+        // Convertir el tablero de objeto a arreglo
+        const tableroData = estado.tablero;
+        const nuevoTablero = Array(9).fill(null);
+        if (tableroData) {
+          for (let i = 0; i < 9; i++) {
+            nuevoTablero[i] = tableroData[i] || null;
+          }
+        }
+
+        // Actualizar variables locales
+        turnoJugador = estado.turnoJugador || 1;
+        tablero = nuevoTablero;
+        faseMover = estado.faseMover || false;
+        fichasColocadasJ1 = estado.fichasColocadasJ1 || 0;
+        fichasColocadasJ2 = estado.fichasColocadasJ2 || 0;
+        ganador = estado.ganador || null;
+        
+        // Actualizar mensaje de turno
+        if (ganador) {
+          mensaje.textContent = `¡Jugador ${ganador} ha ganado!`;
+          document.getElementById('estado-juego').textContent = "Juego terminado";
+        } else {
+          mensaje.textContent = `Turno del Jugador ${turnoJugador}`;
+          if (faseMover) {
+            document.getElementById('estado-juego').textContent = "Fase de movimiento: mueve fichas a posiciones adyacentes";
+          } else {
+            document.getElementById('estado-juego').textContent = "Fase de colocación: coloca tus 3 fichas";
+          }
+        }
+        
+        // Verificar si es mi turno
+        miTurno = !esEspectador && turnoJugador === jugadorNum;
+        
+        // Limpiar tablero y selección
+        limpiarSeleccionPosicion();
+        posicionesTablero.forEach(posicion => {
+          posicion.innerHTML = '';
+        });
+        
+        if (fichaSeleccionada) {
+          fichaSeleccionada.classList.remove('ficha-seleccionada');
+          fichaSeleccionada = null;
+        }
+        
+        // Restaurar fichas en la mano
+        const todasLasFichas = document.querySelectorAll('.ficha');
+        todasLasFichas.forEach(ficha => {
+          ficha.style.opacity = '1';
+          ficha.classList.remove('ficha-en-tablero', 'ficha-seleccionada', 'sin-movimientos');
+        });
+        
+        // Limpiar fichas existentes en el tablero
+        posicionesTablero.forEach(posicion => {
+          posicion.innerHTML = '';
+        });
+
+        // Colocar fichas en el tablero según el estado
+        for (let i = 0; i < tablero.length; i++) {
+          if (tablero[i] === null) continue;
+          
+          const pos = i;
+          const fichaId = tablero[i];
+          const jugadorFicha = parseInt(fichaId.split('-')[0]);
+          const fichaNum = parseInt(fichaId.split('-')[1]);
+          const color = jugadorFicha === 1 ? colorJugador1.value : colorJugador2.value;
+          
+          // Crear ficha en el tablero
+          const fichaTablero = document.createElement('div');
+          fichaTablero.className = 'ficha-tablero';
+          fichaTablero.style.backgroundColor = color;
+          fichaTablero.textContent = fichaNum;
+          fichaTablero.dataset.id = fichaId;
+          
+          // Colocar ficha en el tablero
+          posicionesTablero[pos].appendChild(fichaTablero);
+          
+          // Marcar ficha como colocada
+          const fichaMano = document.querySelector(`[data-id="${fichaId}"]`);
+          if (fichaMano) {
+            fichaMano.style.opacity = '0.5';
+            fichaMano.classList.add('ficha-en-tablero');
+          }
+        }
+        
+        // Si hay ganador, resaltar la combinación ganadora
+        if (ganador) {
+          for (const combinacion of combinacionesGanadoras) {
+            // Obtener las fichas en las posiciones de la combinación
+            const fichas = combinacion.map(pos => tablero[pos]);
+            
+            // Verificar si todas las posiciones tienen fichas
+            if (fichas.includes(null)) {
+              continue;
+            }
+            
+            // Verificar si todas las fichas son del mismo jugador
+            const jugadores = new Set(fichas.map(ficha => ficha.split('-')[0]));
+            
+            if (jugadores.size === 1 && Array.from(jugadores)[0] === ganador.toString()) {
+              combinacion.forEach(pos => {
+                const ficha = posicionesTablero[pos].querySelector('.ficha-tablero');
+                if (ficha) {
+                  ficha.style.boxShadow = '0 0 10px 3px gold';
+                }
+              });
+              break;
+            }
+          }
+        }
+      }
+      
+      // Actualizar estado de los jugadores desde Firebase
+      function actualizarEstadoJugadores(jugadores) {
+        // Actualizar estado de conexión
+        jugador1Status.className = jugadores[1].conectado ? 'jugador-online' : 'jugador-offline';
+        jugador2Status.className = jugadores[2]?.conectado ? 'jugador-online' : 'jugador-offline';
+        
+        // Actualizar colores de las fichas
+        if (jugadores[1].color !== colorJugador1.value) {
+          colorJugador1.value = jugadores[1].color;
+          actualizarColorJugador(1, jugadores[1].color);
+        }
+        
+        if (jugadores[2] && jugadores[2].color !== colorJugador2.value) {
+          colorJugador2.value = jugadores[2].color;
+          actualizarColorJugador(2, jugadores[2].color);
+        }
+        
+        // Actualizar estado de espectador
+        jugador1Espectador.style.display = jugadores[1].espectador ? 'inline' : 'none';
+        if (jugadores[2]) {
+          jugador2Espectador.style.display = jugadores[2].espectador ? 'inline' : 'none';
+        }
+      }
+      
+      // Actualizar el color de un jugador
+      function actualizarColorJugador(jugador, color) {
+        // Actualizar color de fichas en mano
+        const fichas = document.querySelectorAll(`.jugador-${jugador} .ficha`);
+        fichas.forEach(ficha => {
+          ficha.style.backgroundColor = color;
+        });
+        
+        // Actualizar color de fichas en tablero
+        posicionesTablero.forEach((pos, index) => {
+          if (tablero[index] && tablero[index].split('-')[0] === jugador.toString()) {
+            const ficha = pos.querySelector('.ficha-tablero');
+            if (ficha) {
+              ficha.style.backgroundColor = color;
+            }
+          }
+        });
+      }
+      
+      // Sincronizar estado del juego con Firebase
+      function sincronizarEstadoJuego() {
+        console.log("Sincronizando estado:", {
+          turnoJugador,
+          tablero,
+          faseMover,
+          fichasColocadasJ1,
+          fichasColocadasJ2,
+          ganador
+        });
+        
+        database.ref('salas/' + salaId + '/estado').set({
+          turnoJugador: turnoJugador,
+          tablero: tablero,
+          faseMover: faseMover,
+          fichasColocadasJ1: fichasColocadasJ1,
+          fichasColocadasJ2: fichasColocadasJ2,
+          ganador: ganador
+        }).then(() => {
+          console.log("Estado sincronizado correctamente");
+        }).catch(error => {
+          console.error("Error al sincronizar estado:", error);
+          mensaje.textContent = "Error de sincronización. Intenta de nuevo.";
+        });
+      }
+      
+      // Verificar si una ficha tiene movimientos válidos
+      function tieneFichaMovimientosValidos(fichaId) {
+        // Encontrar la posición de la ficha
+        let posicionFicha = -1;
+        for (let i = 0; i < tablero.length; i++) {
+          if (tablero[i] === fichaId) {
+            posicionFicha = i;
+            break;
+          }
+        }
+        
+        if (posicionFicha !== -1) {
+          // Verificar si tiene posiciones adyacentes vacías
+          const posicionesValidas = mapaAdyacencia[posicionFicha].filter(pos => tablero[pos] === null);
+          return posicionesValidas.length > 0;
+        }
+        
+        return false;
+      }
+      
+      // Verificar si alguna ficha del jugador actual tiene movimientos válidos
+      function verificarFichasConMovimientos() {
+        // Obtener las fichas del jugador actual en el tablero
+        const fichasJugador = [];
+        for (let i = 0; i < tablero.length; i++) {
+          if (tablero[i] && tablero[i].startsWith(turnoJugador + '-')) {
+            fichasJugador.push(tablero[i]);
+          }
+        }
+        
+        // Verificar si alguna ficha tiene movimientos válidos
+        return fichasJugador.some(fichaId => tieneFichaMovimientosValidos(fichaId));
+      }
+      
+      // Verificar si hay un ganador
+      function verificarGanador() {
+        for (const combinacion of combinacionesGanadoras) {
+          const pos1 = combinacion[0];
+          const pos2 = combinacion[1];
+          const pos3 = combinacion[2];
+          
+          if (tablero[pos1] && tablero[pos2] && tablero[pos3]) {
+            const jugador1 = tablero[pos1].split('-')[0];
+            const jugador2 = tablero[pos2].split('-')[0];
+            const jugador3 = tablero[pos3].split('-')[0];
+            
+            if (jugador1 === jugador2 && jugador2 === jugador3) {
+              return parseInt(jugador1);
+            }
+          }
+        }
+        
+        return null;
+      }
+      
+      // Limpiar selección de posición
+      function limpiarSeleccionPosicion() {
+        posicionesTablero.forEach(pos => {
+          pos.classList.remove('posicion-valida', 'posicion-seleccionada');
+        });
+      }
+      
+      // Mostrar posiciones válidas para colocar ficha
+      function mostrarPosicionesValidasColocacion() {
+        limpiarSeleccionPosicion();
+        
+        // Verificar que posicionesTablero y tablero estén definidos
+        if (!posicionesTablero || !tablero) {
+            console.error("posicionesTablero o tablero no están definidos");
+            return;
+        }
+        
+        // Durante la fase de colocación, todas las posiciones vacías son válidas
+        posicionesTablero.forEach((pos, i) => {
+            if (i < tablero.length && tablero[i] === null) {
+            pos.classList.add('posicion-valida');
+            }
+        });
+        }
+      
+      // Mostrar posiciones válidas para mover ficha
+      function mostrarPosicionesValidasMovimiento(fichaId) {
+        limpiarSeleccionPosicion();
+        
+        // Encontrar la posición actual de la ficha
+        let posicionActual = -1;
+        for (let i = 0; i < tablero.length; i++) {
+          if (tablero[i] === fichaId) {
+            posicionActual = i;
+            break;
+          }
+        }
+        
+        if (posicionActual !== -1) {
+          // Mostrar posiciones adyacentes que estén vacías
+          const adyacentes = mapaAdyacencia[posicionActual];
+          for (const pos of adyacentes) {
+            if (tablero[pos] === null) {
+              posicionesTablero[pos].classList.add('posicion-valida');
+            }
+          }
+        }
+      }
+      
+      // Manejar selección de ficha
+      function seleccionarFicha(ficha) {
+        // Solo permitir selección si es mi turno y no hay ganador
+        if (!miTurno || ganador) return;
+        
+        const fichaId = ficha.dataset.id;
+        const jugadorFicha = parseInt(fichaId.split('-')[0]);
+        
+        // Verificar que sea una ficha del jugador actual
+        if (jugadorFicha !== turnoJugador) return;
+        
+        // Verificar que la ficha no esté ya en el tablero durante la fase de colocación
+        if (!faseMover && ficha.classList.contains('ficha-en-tablero')) return;
+        
+        // En fase de movimiento, solo permitir seleccionar fichas en el tablero
+        if (faseMover && !ficha.classList.contains('ficha-en-tablero')) return;
+        
+        // En fase de movimiento, verificar que la ficha tenga movimientos válidos
+        if (faseMover && !tieneFichaMovimientosValidos(fichaId)) {
+          ficha.classList.add('sin-movimientos');
+          setTimeout(() => {
+            ficha.classList.remove('sin-movimientos');
+          }, 1000);
+          return;
+        }
+        
+        // Limpiar selección anterior
+        if (fichaSeleccionada) {
+          fichaSeleccionada.classList.remove('ficha-seleccionada');
+        }
+        
+        // Seleccionar nueva ficha
+        ficha.classList.add('ficha-seleccionada');
+        fichaSeleccionada = ficha;
+        
+        // Mostrar posiciones válidas
+        if (faseMover) {
+          mostrarPosicionesValidasMovimiento(fichaId);
+        } else {
+          mostrarPosicionesValidasColocacion();
+        }
+      }
+      
+      // Manejar colocación o movimiento de ficha
+      function colocarOMoveFicha(pos) {
+        // Verificar que haya una ficha seleccionada y sea una posición válida
+        if (!fichaSeleccionada || !pos.classList.contains('posicion-valida')) return;
+        
+        const posIndex = parseInt(pos.dataset.pos);
+        const fichaId = fichaSeleccionada.dataset.id;
+        
+        // En fase de movimiento, eliminar la ficha de su posición anterior
+        if (faseMover) {
+          for (let i = 0; i < tablero.length; i++) {
+            if (tablero[i] === fichaId) {
+              tablero[i] = null;
+              break;
+            }
+          }
+        }
+        
+        // Colocar la ficha en la nueva posición
+        tablero[posIndex] = fichaId;
+        
+        // Actualizar contadores de fichas colocadas
+        if (!faseMover) {
+          if (turnoJugador === 1) {
+            fichasColocadasJ1++;
+          } else {
+            fichasColocadasJ2++;
+          }
+          
+          // Verificar si pasamos a fase de movimiento
+          if (fichasColocadasJ1 === 3 && fichasColocadasJ2 === 3) {
+            faseMover = true;
+          }
+        }
+        
+        // Verificar si hay ganador
+        ganador = verificarGanador();
+        
+        // Cambiar turno si no hay ganador
+        if (!ganador) {
+          turnoJugador = turnoJugador === 1 ? 2 : 1;
+          
+          // Si el siguiente jugador no tiene movimientos válidos, regresa el turno
+          if (faseMover && !verificarFichasConMovimientos()) {
+            // Solo anunciar esto si ambos jugadores están conectados
+            if (jugador1Status.classList.contains('jugador-online') && 
+                jugador2Status.classList.contains('jugador-online')) {
+              mensaje.textContent = `¡Jugador ${turnoJugador} sin movimientos válidos! Turno de Jugador ${turnoJugador === 1 ? 2 : 1}`;
+              setTimeout(() => {
+                turnoJugador = turnoJugador === 1 ? 2 : 1;
+                mensaje.textContent = `Turno del Jugador ${turnoJugador}`;
+                sincronizarEstadoJuego();
+              }, 2000);
+              return;
+            }
+          }
+        }
+        
+        // Sincronizar con Firebase
+        sincronizarEstadoJuego();
+      }
+      
+      // Iniciar juego
+      function iniciarJuego() {
+        // Agregar listeners a las fichas del jugador 1
+        fichasJugador1.forEach(ficha => {
+          ficha.addEventListener('click', function() {
+            seleccionarFicha(this);
+          });
+        });
+        
+        // Agregar listeners a las fichas del jugador 2
+        fichasJugador2.forEach(ficha => {
+          ficha.addEventListener('click', function() {
+            seleccionarFicha(this);
+          });
+        });
+        
+        // Agregar listeners a las posiciones del tablero
+        posicionesTablero.forEach(pos => {
+          pos.addEventListener('click', function() {
+            if (miTurno && fichaSeleccionada) {
+              colocarOMoveFicha(this);
+            }
+          });
+        });
+        
+        // Listener para cambio de color del jugador 1
+        colorJugador1.addEventListener('change', function() {
+          if (jugadorNum === 1 && !esEspectador) {
+            database.ref('salas/' + salaId + '/jugadores/1/color').set(this.value);
+          }
+        });
+        
+        // Listener para cambio de color del jugador 2
+        colorJugador2.addEventListener('change', function() {
+          if (jugadorNum === 2 && !esEspectador) {
+            database.ref('salas/' + salaId + '/jugadores/2/color').set(this.value);
+          }
+        });
+        
+        // Listener para reiniciar juego
+        btnReiniciar.addEventListener('click', function() {
+          if (esEspectador) return;
+          
+          // Reiniciar variables
+          turnoJugador = 1;
+          tablero = Array(9).fill(null);
+          faseMover = false;
+          fichasColocadasJ1 = 0;
+          fichasColocadasJ2 = 0;
+          ganador = null;
+          
+          // Sincronizar con Firebase
+          sincronizarEstadoJuego();
+        });
+      }
+      
+      // Event Listeners para los botones de conexión
+      crearSalaBtn.addEventListener('click', crearSala);
+      
+      unirseSalaBtn.addEventListener('click', function() {
+        conexionOpciones.style.display = 'none';
+        unirseForm.style.display = 'block';
+      });
+      
+      btnUnirse.addEventListener('click', function() {
+        const codigo = inputCodigo.value.trim();
+        if (codigo.length === 6) {
+          unirseASala(codigo);
+        } else {
+          conexionMensaje.textContent = "El código debe tener 6 caracteres.";
+        }
+      });
+      
+      copiarCodigoBtn.addEventListener('click', function() {
+        navigator.clipboard.writeText(codigoSala.textContent)
+          .then(() => {
+            this.textContent = "¡Copiado!";
+            setTimeout(() => {
+              this.textContent = "Copiar código";
+            }, 2000);
+          });
+      });
+    });
+  </script>
+</body>
+</html>
