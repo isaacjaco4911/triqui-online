@@ -510,33 +510,36 @@
         miTurno = true;
         esEspectador = false;
         
+        // Inicializar estado del juego
+        const estadoInicial = {
+            turnoJugador: 1,
+            tablero: Array(9).fill(null), // Usar array nuevo en lugar de variable global
+            faseMover: false,
+            fichasColocadasJ1: 0,
+            fichasColocadasJ2: 0,
+            ganador: null
+        };
+
         // Crear sala en Firebase
         database.ref('salas/' + salaId).set({
-          estado: {
-            turnoJugador: 1,
-            tablero: tablero,
-            faseMover: faseMover,
-            fichasColocadasJ1: fichasColocadasJ1,
-            fichasColocadasJ2: fichasColocadasJ2,
-            ganador: null
-          },
-          jugadores: {
-            1: {
-              conectado: true,
-              color: colorJugador1.value,
-              espectador: false,
-              forma: formaJugador1.value
-            },
-            2: {
-              conectado: false,
-              color: colorJugador2.value,
-              espectador: false,
-              forma: formaJugador2.value
+            estado: estadoInicial,
+            jugadores: {
+                1: {
+                    conectado: true,
+                    color: colorJugador1.value,
+                    espectador: false,
+                    forma: formaJugador1.value
+                },
+                2: {
+                    conectado: false,
+                    color: colorJugador2.value,
+                    espectador: false,
+                    forma: formaJugador2.value
+                }
             }
-          }
         });
-        
-        // Actualizar presencia al desconectar
+
+        // Configurar desconexión
         database.ref('salas/' + salaId + '/jugadores/1/conectado').onDisconnect().set(false);
         
         // Mostrar código de sala
@@ -544,84 +547,83 @@
         conexionOpciones.style.display = 'none';
         salaCreada.style.display = 'block';
         
-        // Registrar listeners
-        conectarseASala();
+        // Listener para detectar conexión del jugador 2
+        database.ref('salas/' + salaId + '/jugadores').on('value', (snapshot) => {
+            const jugadores = snapshot.val();
+            if (jugadores && jugadores[2]?.conectado) {
+                // Ocultar UI de conexión y mostrar juego
+                conexionContainer.style.display = 'none';
+                juegoContainer.style.display = 'block';
+                conectarseASala();
+            }
+        });
       }
       
       // Unirse a una sala existente
       function unirseASala(codigo) {
         salaId = codigo.toUpperCase();
         
-        // Verificar si la sala existe
-        database.ref('salas/' + salaId).once('value', (snapshot) => {
-          if (snapshot.exists()) {
+        database.ref('salas/' + salaId).once('value').then((snapshot) => {
+            if (!snapshot.exists()) {
+                conexionMensaje.textContent = "La sala no existe. Verifica el código.";
+                return;
+            }
+
             const data = snapshot.val();
             
-            if (data.jugadores[2] && data.jugadores[2].conectado) {
-              // Ambos jugadores ya están conectados, unirse como espectador
-              jugadorNum = 3; // Espectador
-              esEspectador = true;
-              miTurno = false;
-              
-              // Actualizar UI para espectador
-              mensaje.textContent = "Estás observando la partida";
-              
-              // Mostrar quien es espectador
-              if (data.jugadores[1].espectador) {
-                jugador1Espectador.style.display = 'inline';
-              }
-              if (data.jugadores[2].espectador) {
-                jugador2Espectador.style.display = 'inline';
-              }
-              
-              // Conectarse como espectador
-              conectarseASala();
+            if (data.jugadores[2]?.conectado) {
+                // Modo espectador
+                jugadorNum = 3;
+                esEspectador = true;
+                miTurno = false;
+                
+                // Actualizar UI
+                conexionContainer.style.display = 'none';
+                juegoContainer.style.display = 'block';
+                mensaje.textContent = "Estás observando la partida";
+                conectarseASala();
             } else {
-              // Unirse como jugador 2
-              jugadorNum = 2;
-              miTurno = data.estado.turnoJugador === 2;
-              esEspectador = false;
-              
-              // Actualizar estado en Firebase
-              database.ref('salas/' + salaId + '/jugadores/2').update({
-                conectado: true,
-                color: colorJugador2.value,
-                espectador: false,
-                forma: formaJugador2.value
-              });
-              
-              // Actualizar presencia al desconectar
-              database.ref('salas/' + salaId + '/jugadores/2/conectado').onDisconnect().set(false);
-              
-              // Conectarse a la sala
-              conectarseASala();
+                // Unirse como jugador 2
+                jugadorNum = 2;
+                esEspectador = false;
+                
+                database.ref('salas/' + salaId + '/jugadores/2').update({
+                    conectado: true,
+                    color: colorJugador2.value,
+                    espectador: false,
+                    forma: formaJugador2.value
+                }).then(() => {
+                    // Configurar desconexión
+                    database.ref('salas/' + salaId + '/jugadores/2/conectado').onDisconnect().set(false);
+                    
+                    // Entrar al juego
+                    conexionContainer.style.display = 'none';
+                    juegoContainer.style.display = 'block';
+                    conectarseASala();
+                });
             }
-          } else {
-            // La sala no existe
-            conexionMensaje.textContent = "La sala no existe. Verifica el código.";
-          }
+        }).catch((error) => {
+            conexionMensaje.textContent = "Error al unirse a la sala";
         });
       }
       
       // Conectarse a una sala y configurar listeners
       function conectarseASala() {
-        // Ocultar contenedor de conexión y mostrar el juego
-        conexionContainer.style.display = 'none';
-        juegoContainer.style.display = 'block';
-        
-        // Listener para cambios en el estado del juego
-        database.ref('salas/' + salaId + '/estado').on('value', (snapshot) => {
-          const estadoJuego = snapshot.val();
-          actualizarEstadoJuego(estadoJuego);
+        // Configurar listeners del estado del juego
+        const estadoRef = database.ref('salas/' + salaId + '/estado');
+        estadoRef.on('value', (snapshot) => {
+            const estado = snapshot.val();
+            if (estado) actualizarEstadoJuego(estado);
         });
-        
-        // Listener para cambios en los jugadores
-        database.ref('salas/' + salaId + '/jugadores').on('value', (snapshot) => {
-          const jugadores = snapshot.val();
-          actualizarEstadoJugadores(jugadores);
+
+        // Listener para jugadores
+        const jugadoresRef = database.ref('salas/' + salaId + '/jugadores');
+        jugadoresRef.on('value', (snapshot) => {
+            const jugadores = snapshot.val();
+            if (jugadores) actualizarEstadoJugadores(jugadores);
         });
-        
-        // Configurar el juego
+
+        // Iniciar lógica del juego
         iniciarJuego();
       }
       
