@@ -163,6 +163,18 @@
       color: #fff;
     }
     
+    .ficha-tablero[data-forma="star"] {
+      /* Styles to make the div look like a star */
+      clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+      border-radius: 0;
+    }
+
+    .ficha-tablero[data-forma="triangle"] {
+      /* Styles to make the div look like a triangle */
+      clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+      border-radius: 0;
+    }
+    
     .mensaje {
       height: 30px;
       font-weight: bold;
@@ -336,6 +348,11 @@
             <div class="ficha" data-id="2-3">3</div>
           </div>
           <input type="color" class="selector-color" id="color-jugador-2" value="#3498db">
+          <select class="selector-forma" id="forma-jugador-2">
+            <option value="circle">Círculo</option>
+            <option value="star">Estrella</option>
+            <option value="triangle">Triángulo</option>
+          </select>
         </div>
         
         <div class="jugador jugador-1">
@@ -350,11 +367,17 @@
             <div class="ficha" data-id="1-3">3</div>
           </div>
           <input type="color" class="selector-color" id="color-jugador-1" value="#e74c3c">
+          <select class="selector-forma" id="forma-jugador-1">
+            <option value="circle">Círculo</option>
+            <option value="star">Estrella</option>
+            <option value="triangle">Triángulo</option>
+          </select>
         </div>
       </div>
       
       <div class="mensaje" id="mensaje">Esperando jugadores...</div>
       <div class="estado-juego" id="estado-juego">Fase de colocación: coloca tus 3 fichas</div>
+      <div class="timer" id="timer">Tiempo restante: 30</div>
       
       <div class="tablero" id="tablero">
         <div class="linea horizontal"></div>
@@ -465,8 +488,15 @@
       const fichasJugador2 = document.getElementById('fichas-jugador-2').querySelectorAll('.ficha');
       const colorJugador1 = document.getElementById('color-jugador-1');
       const colorJugador2 = document.getElementById('color-jugador-2');
+      const formaJugador1 = document.getElementById('forma-jugador-1');
+      const formaJugador2 = document.getElementById('forma-jugador-2');
       const btnReiniciar = document.getElementById('reiniciar');
       const posicionesTablero = document.querySelectorAll('.posicion');
+      
+      // Timer variables
+      const timerDisplay = document.getElementById('timer');
+      let timeLeft = 30;
+      let timerInterval;
       
       // Generar ID único para la sala
       function generarSalaId() {
@@ -494,12 +524,14 @@
             1: {
               conectado: true,
               color: colorJugador1.value,
-              espectador: false
+              espectador: false,
+              forma: formaJugador1.value
             },
             2: {
               conectado: false,
               color: colorJugador2.value,
-              espectador: false
+              espectador: false,
+              forma: formaJugador2.value
             }
           }
         });
@@ -554,7 +586,8 @@
               database.ref('salas/' + salaId + '/jugadores/2').update({
                 conectado: true,
                 color: colorJugador2.value,
-                espectador: false
+                espectador: false,
+                forma: formaJugador2.value
               });
               
               // Actualizar presencia al desconectar
@@ -590,6 +623,57 @@
         
         // Configurar el juego
         iniciarJuego();
+      }
+      
+      // Update timer display
+      function updateTimerDisplay() {
+        timerDisplay.textContent = `Tiempo restante: ${timeLeft}`;
+      }
+      
+      // Start timer
+      function startTimer() {
+        clearInterval(timerInterval);
+        timeLeft = 30;
+        updateTimerDisplay();
+        
+        // Solo iniciar el temporizador si ambos jugadores están conectados
+        if (jugador1Status.classList.contains('jugador-online') && 
+            jugador2Status.classList.contains('jugador-online')) {
+          timerInterval = setInterval(() => {
+            timeLeft--;
+            updateTimerDisplay();
+            
+            if (timeLeft <= 0) {
+              clearInterval(timerInterval);
+              timeOutTurn();
+            }
+          }, 1000);
+        }
+      }
+      
+      // Function when time runs out
+      function timeOutTurn() {
+        if (ganador) return;
+        
+        // Cambiar turno
+        turnoJugador = turnoJugador === 1 ? 2 : 1;
+        
+        // Si el siguiente jugador no tiene movimientos válidos, regresa el turno
+        if (faseMover && !verificarFichasConMovimientos()) {
+          // Solo anunciar esto si ambos jugadores están conectados
+          if (jugador1Status.classList.contains('jugador-online') && 
+              jugador2Status.classList.contains('jugador-online')) {
+            mensaje.textContent = `¡Jugador ${turnoJugador} sin movimientos válidos! Turno de Jugador ${turnoJugador === 1 ? 2 : 1}`;
+            setTimeout(() => {
+              turnoJugador = turnoJugador === 1 ? 2 : 1;
+              mensaje.textContent = `Turno del Jugador ${turnoJugador}`;
+              sincronizarEstadoJuego();
+            }, 2000);
+            return;
+          }
+        }
+        
+        sincronizarEstadoJuego();
       }
       
       // Actualizar estado del juego desde Firebase
@@ -671,6 +755,7 @@
           fichaTablero.style.backgroundColor = color;
           fichaTablero.textContent = fichaNum;
           fichaTablero.dataset.id = fichaId;
+          fichaTablero.dataset.forma = jugadorFicha === 1 ? formaJugador1.value : formaJugador2.value;
           
           // Colocar ficha en el tablero
           posicionesTablero[pos].appendChild(fichaTablero);
@@ -708,6 +793,9 @@
             }
           }
         }
+        
+        // Iniciar timer cuando el estado del juego se actualiza
+        startTimer();
       }
       
       // Actualizar estado de los jugadores desde Firebase
@@ -725,6 +813,17 @@
         if (jugadores[2] && jugadores[2].color !== colorJugador2.value) {
           colorJugador2.value = jugadores[2].color;
           actualizarColorJugador(2, jugadores[2].color);
+        }
+
+        // Actualizar formas de las fichas
+        if (jugadores[1].forma !== formaJugador1.value) {
+          formaJugador1.value = jugadores[1].forma;
+          actualizarFormaJugador(1, jugadores[1].forma);
+        }
+
+        if (jugadores[2] && jugadores[2].forma !== formaJugador2.value) {
+          formaJugador2.value = jugadores[2].forma;
+          actualizarFormaJugador(2, jugadores[2].forma);
         }
         
         // Actualizar estado de espectador
@@ -748,6 +847,25 @@
             const ficha = pos.querySelector('.ficha-tablero');
             if (ficha) {
               ficha.style.backgroundColor = color;
+            }
+          }
+        });
+      }
+
+      // Actualizar la forma de un jugador
+      function actualizarFormaJugador(jugador, forma) {
+        // Actualizar forma de fichas en mano
+        const fichas = document.querySelectorAll(`.jugador-${jugador} .ficha`);
+        fichas.forEach(ficha => {
+          ficha.dataset.forma = forma; // Store the shape as a data attribute
+        });
+
+        // Actualizar forma de fichas en tablero
+        posicionesTablero.forEach((pos, index) => {
+          if (tablero[index] && tablero[index].split('-')[0] === jugador.toString()) {
+            const ficha = pos.querySelector('.ficha-tablero');
+            if (ficha) {
+              ficha.dataset.forma = forma; // Store the shape as a data attribute
             }
           }
         });
@@ -1027,6 +1145,20 @@
           }
         });
         
+        // Listener para cambio de forma del jugador 1
+        formaJugador1.addEventListener('change', function() {
+          if (jugadorNum === 1 && !esEspectador) {
+            database.ref('salas/' + salaId + '/jugadores/1/forma').set(this.value);
+          }
+        });
+        
+        // Listener para cambio de forma del jugador 2
+        formaJugador2.addEventListener('change', function() {
+          if (jugadorNum === 2 && !esEspectador) {
+            database.ref('salas/' + salaId + '/jugadores/2/forma').set(this.value);
+          }
+        });
+        
         // Listener para reiniciar juego
         btnReiniciar.addEventListener('click', function() {
           if (esEspectador) return;
@@ -1045,6 +1177,14 @@
       }
       
       // Event Listeners para los botones de conexión
+      
+      // Reset timer when game is reset
+      function resetTimer() {
+        clearInterval(timerInterval);
+        timeLeft = 30;
+        updateTimerDisplay();
+      }
+      
       crearSalaBtn.addEventListener('click', crearSala);
       
       unirseSalaBtn.addEventListener('click', function() {
