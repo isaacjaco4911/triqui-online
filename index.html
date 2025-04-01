@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, 1.0, maximum-scale=1.0, user-scalable=no">
   <title>Triqui By Isaac</title>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-app-compat.js"></script>
@@ -216,6 +216,7 @@
       border-radius: 4px;
       cursor: pointer;
       font-size: 16px;
+      display: none; /* Ocultar por defecto */
     }
     
     .reiniciar:hover {
@@ -1072,6 +1073,7 @@
         if (ganador) {
           mensaje.textContent = `¡Jugador ${ganador} ha ganado!`;
           document.getElementById('estado-juego').textContent = "Juego terminado";
+          btnReiniciar.style.display = 'block'; // Mostrar botón cuando hay ganador
         } else {
           mensaje.textContent = `Turno del Jugador ${turnoJugador}`;
           if (faseMover) {
@@ -1079,6 +1081,7 @@
           } else {
             document.getElementById('estado-juego').textContent = "Fase de colocación: coloca tus 3 fichas";
           }
+          btnReiniciar.style.display = 'none'; // Ocultar botón mientras se juega
         }
         
         // Verificar si es mi turno
