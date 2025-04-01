@@ -7,6 +7,7 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-auth-compat.js"></script>
   <style>
     body {
       display: flex;
@@ -303,11 +304,125 @@
       border-radius: 50%;
       background-color: #e74c3c;
     }
+
+    /* Estilos para auth */
+    .auth-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 20px;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background-color: #fff;
+    }
+
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 300px;
+    }
+
+    .auth-input {
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    .auth-toggle {
+      color: #3498db;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Estilos para estadísticas y ranking */
+    .stats-container {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .stat-item {
+      text-align: center;
+      padding: 10px;
+      background-color: #f8f9fa;
+      border-radius: 4px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #2c3e50;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: #7f8c8d;
+    }
+
+    .ranking-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+
+    .ranking-table th,
+    .ranking-table td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .ranking-table th {
+      background-color: #f5f6fa;
+      font-weight: bold;
+    }
+
+    .ranking-table tr:nth-child(even) {
+      background-color: #f8f9fa;
+    }
+
+    .ranking-table tr:hover {
+      background-color: #f1f2f6;
+    }
   </style>
 </head>
 <body>
   <div class="contenedor-juego">
     <h1>Triqui By Isaac</h1>
+
+    <!-- Auth Container -->
+    <div class="auth-container" id="auth-container">
+      <div class="user-info" id="user-info" style="display: none;">
+        <span>Bienvenido, <span id="username-display"></span></span>
+        <button class="btn" id="logout-btn">Cerrar sesión</button>
+      </div>
+
+      <form class="auth-form" id="auth-form">
+        <input type="text" class="auth-input" id="username" placeholder="Nombre de usuario">
+        <input type="email" class="auth-input" id="email" placeholder="Correo electrónico" required>
+        <input type="password" class="auth-input" id="password" placeholder="Contraseña" required>
+        <button type="submit" class="btn" id="auth-submit">Registrarse</button>
+        <span class="auth-toggle" id="auth-toggle">¿Ya tienes cuenta? Inicia sesión</span>
+      </form>
+    </div>
     
     <!-- Contenedor de conexión -->
     <div class="conexion-container" id="conexion-container">
@@ -404,6 +519,40 @@
       
       <button class="reiniciar" id="reiniciar">Reiniciar Juego</button>
     </div>
+
+    <!-- Contenedor de estadísticas -->
+    <div class="stats-container" id="stats-container" style="display: none;">
+      <h2>Mis Estadísticas</h2>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value" id="stats-victories">0</div>
+          <div class="stat-label">Victorias</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="stats-defeats">0</div>
+          <div class="stat-label">Derrotas</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="stats-avg-time">0s</div>
+          <div class="stat-label">Tiempo Promedio</div>
+        </div>
+      </div>
+      
+      <h3>Ranking Global</h3>
+      <table class="ranking-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Jugador</th>
+            <th>Victorias</th>
+            <th>Derrotas</th>
+            <th>Ratio</th>
+          </tr>
+        </thead>
+        <tbody id="ranking-table-body">
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <script>
@@ -416,12 +565,143 @@
         storageBucket: "cloudflare-3098a.firebasestorage.app",
         messagingSenderId: "985997253869",
         appId: "1:985997253869:web:ae57f49db56dec7d1d00e4"
-        };
+      };
       
       // Inicializar Firebase
       firebase.initializeApp(firebaseConfig);
       const database = firebase.database();
-      
+      const auth = firebase.auth();
+
+      // Referencias al DOM
+      const juegoContainer = document.getElementById('juego-container');
+      const authContainer = document.getElementById('auth-container');
+      const authForm = document.getElementById('auth-form');
+      const authToggle = document.getElementById('auth-toggle');
+      const authSubmit = document.getElementById('auth-submit');
+      const userInfo = document.getElementById('user-info');
+      const usernameDisplay = document.getElementById('username-display');
+      const logoutBtn = document.getElementById('logout-btn');
+      const conexionContainer = document.getElementById('conexion-container');
+
+      let isLogin = false;
+
+      // Toggle entre login y registro
+      authToggle.addEventListener('click', () => {
+        isLogin = !isLogin;
+        authSubmit.textContent = isLogin ? 'Iniciar sesión' : 'Registrarse';
+        authToggle.textContent = isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión';
+        const usernameInput = document.getElementById('username');
+        usernameInput.style.display = isLogin ? 'none' : 'block';
+        usernameInput.required = !isLogin;
+      });
+
+      // Manejar registro/login
+      authForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const username = document.getElementById('username').value;
+
+        if (isLogin) {
+          // Login
+          auth.signInWithEmailAndPassword(email, password)
+            .catch(error => {
+              alert('Error: ' + error.message);
+            });
+        } else {
+          // Registro
+          auth.createUserWithEmailAndPassword(email, password)
+            .then((userCredential) => {
+              // Guardar username en Realtime Database
+              return database.ref('users/' + userCredential.user.uid).set({
+                username: username
+              });
+            })
+            .catch(error => {
+              alert('Error: ' + error.message);
+            });
+        }
+      });
+
+      // Manejar logout
+      logoutBtn.addEventListener('click', () => {
+        // Desconectar listeners si hay una sala activa
+        if (salaId) {
+          database.ref('salas/' + salaId + '/estado').off();
+          database.ref('salas/' + salaId + '/jugadores').off();
+          
+          // Si es jugador, marcar como desconectado
+          if (jugadorNum === 1 || jugadorNum === 2) {
+            database.ref('salas/' + salaId + '/jugadores/' + jugadorNum + '/conectado').set(false);
+          }
+        }
+
+        // Limpiar URL
+        window.history.pushState({}, '', window.location.pathname);
+        
+        // Reiniciar variables
+        salaId = null;
+        jugadorNum = null;
+        miTurno = false;
+        esEspectador = false;
+        
+        // Cerrar sesión
+        auth.signOut();
+      });
+
+      // Observer de estado de autenticación
+      auth.onAuthStateChanged((user) => {
+        if (user) {
+          database.ref('users/' + user.uid).once('value')
+            .then(snapshot => {
+              const userData = snapshot.val();
+              if (userData && userData.username) {
+                usernameDisplay.textContent = userData.username;
+                authForm.style.display = 'none';
+                userInfo.style.display = 'flex';
+                conexionContainer.style.display = 'block';
+                document.getElementById('stats-container').style.display = 'block';
+                initializeUserStats(user.uid);
+                loadUserStats(user.uid);
+                updateRankingTable();
+                
+                // Solo unirse a sala desde URL si no hay sala activa
+                if (!salaId) {
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const salaIdFromUrl = urlParams.get('sala');
+                  if (salaIdFromUrl) {
+                    unirseASala(salaIdFromUrl);
+                  }
+                }
+              }
+            });
+        } else {
+          // Usuario no autenticado
+          authForm.style.display = 'flex';
+          userInfo.style.display = 'none';
+          conexionContainer.style.display = 'none';
+          juegoContainer.style.display = 'none';
+          document.getElementById('stats-container').style.display = 'none';
+          
+          // Desconectar listeners si hay una sala activa
+          if (salaId) {
+            database.ref('salas/' + salaId + '/estado').off();
+            database.ref('salas/' + salaId + '/jugadores').off();
+          }
+          
+          // Reiniciar variables
+          salaId = null;
+          jugadorNum = null;
+          miTurno = false;
+          esEspectador = false;
+          
+          // Limpiar URL
+          window.history.pushState({}, '', window.location.pathname);
+        }
+      });
+
+      // Resto del código del juego
       // Variables para la conexión
       let salaId = null;
       let jugadorNum = null;
@@ -429,8 +709,6 @@
       let esEspectador = false;
       
       // Referencias al DOM para la conexión
-      const conexionContainer = document.getElementById('conexion-container');
-      const juegoContainer = document.getElementById('juego-container');
       const crearSalaBtn = document.getElementById('crear-sala');
       const unirseSalaBtn = document.getElementById('unirse-sala');
       const salaCreada = document.getElementById('sala-creada');
@@ -505,39 +783,50 @@
       
       // Crear una nueva sala
       function crearSala() {
+        if (!auth.currentUser) return;
+
         salaId = generarSalaId();
         jugadorNum = 1;
         miTurno = true;
         esEspectador = false;
-        
-        // Inicializar estado del juego
-        const estadoInicial = {
-            turnoJugador: 1,
-            tablero: Array(9).fill(null), // Usar array nuevo en lugar de variable global
-            faseMover: false,
-            fichasColocadasJ1: 0,
-            fichasColocadasJ2: 0,
-            ganador: null
-        };
 
-        // Crear sala en Firebase
-        database.ref('salas/' + salaId).set({
-            estado: estadoInicial,
-            jugadores: {
+        // Agregar el ID de la sala a la URL
+        const newUrl = `${window.location.pathname}?sala=${salaId}`;
+        window.history.pushState({}, '', newUrl);
+
+        database.ref('users/' + auth.currentUser.uid).once('value')
+          .then(snapshot => {
+            const userData = snapshot.val();
+            const estadoInicial = {
+              turnoJugador: 1,
+              tablero: Array(9).fill(null), // Usar array nuevo en lugar de variable global
+              faseMover: false,
+              fichasColocadasJ1: 0,
+              fichasColocadasJ2: 0,
+              ganador: null,
+              terminada: false  // Agregar este campo
+            };
+
+            return database.ref('salas/' + salaId).set({
+              estado: estadoInicial,
+              jugadores: {
                 1: {
-                    conectado: true,
-                    color: colorJugador1.value,
-                    espectador: false,
-                    forma: formaJugador1.value
+                  conectado: true,
+                  color: colorJugador1.value,
+                  espectador: false,
+                  forma: formaJugador1.value,
+                  uid: auth.currentUser.uid,
+                  username: userData.username
                 },
                 2: {
-                    conectado: false,
-                    color: colorJugador2.value,
-                    espectador: false,
-                    forma: formaJugador2.value
+                  conectado: false,
+                  color: colorJugador2.value,
+                  espectador: false,
+                  forma: formaJugador2.value
                 }
-            }
-        });
+              }
+            });
+          });
 
         // Configurar desconexión
         database.ref('salas/' + salaId + '/jugadores/1/conectado').onDisconnect().set(false);
@@ -561,6 +850,8 @@
       
       // Unirse a una sala existente
       function unirseASala(codigo) {
+        if (!auth.currentUser) return;
+
         salaId = codigo.toUpperCase();
         
         database.ref('salas/' + salaId).once('value').then((snapshot) => {
@@ -571,37 +862,46 @@
 
             const data = snapshot.val();
             
+            // Verificar si la sala está llena
             if (data.jugadores[2]?.conectado) {
                 // Modo espectador
                 jugadorNum = 3;
                 esEspectador = true;
                 miTurno = false;
-                
-                // Actualizar UI
-                conexionContainer.style.display = 'none';
-                juegoContainer.style.display = 'block';
-                mensaje.textContent = "Estás observando la partida";
-                conectarseASala();
             } else {
                 // Unirse como jugador 2
                 jugadorNum = 2;
                 esEspectador = false;
-                
-                database.ref('salas/' + salaId + '/jugadores/2').update({
-                    conectado: true,
-                    color: colorJugador2.value,
-                    espectador: false,
-                    forma: formaJugador2.value
-                }).then(() => {
-                    // Configurar desconexión
-                    database.ref('salas/' + salaId + '/jugadores/2/conectado').onDisconnect().set(false);
-                    
-                    // Entrar al juego
-                    conexionContainer.style.display = 'none';
-                    juegoContainer.style.display = 'block';
-                    conectarseASala();
-                });
             }
+
+            // Actualizar UI y conectarse
+            conexionContainer.style.display = 'none';
+            juegoContainer.style.display = 'block';
+            mensaje.textContent = esEspectador ? "Estás observando la partida" : "Te has unido a la partida";
+            
+            // Si no es espectador, actualizar información del jugador
+            if (!esEspectador) {
+                database.ref('users/' + auth.currentUser.uid).once('value')
+                    .then(snapshot => {
+                        const userData = snapshot.val();
+                        return database.ref('salas/' + salaId + '/jugadores/2').update({
+                            conectado: true,
+                            color: colorJugador2.value,
+                            espectador: false,
+                            forma: formaJugador2.value,
+                            uid: auth.currentUser.uid,
+                            username: userData.username
+                        });
+                    });
+            }
+            
+            // Agregar el ID de la sala a la URL si no está ya
+            if (!window.location.search.includes(salaId)) {
+                const newUrl = `${window.location.pathname}?sala=${salaId}`;
+                window.history.pushState({}, '', newUrl);
+            }
+            
+            conectarseASala();
         }).catch((error) => {
             conexionMensaje.textContent = "Error al unirse a la sala";
         });
@@ -609,22 +909,34 @@
       
       // Conectarse a una sala y configurar listeners
       function conectarseASala() {
-        // Configurar listeners del estado del juego
-        const estadoRef = database.ref('salas/' + salaId + '/estado');
-        estadoRef.on('value', (snapshot) => {
-            const estado = snapshot.val();
-            if (estado) actualizarEstadoJuego(estado);
-        });
+        // Verificar si la sala está terminada
+        database.ref('salas/' + salaId + '/estado/terminada').once('value', (snapshot) => {
+            if (snapshot.val()) {
+                conexionMensaje.textContent = "Esta sala ha sido terminada.";
+                conexionContainer.style.display = 'block';
+                juegoContainer.style.display = 'none';
+                salaId = null;
+                jugadorNum = null;
+                return;
+            }
+            
+            // Configurar listeners del estado del juego
+            const estadoRef = database.ref('salas/' + salaId + '/estado');
+            estadoRef.on('value', (snapshot) => {
+                const estado = snapshot.val();
+                if (estado) actualizarEstadoJuego(estado);
+            });
 
-        // Listener para jugadores
-        const jugadoresRef = database.ref('salas/' + salaId + '/jugadores');
-        jugadoresRef.on('value', (snapshot) => {
-            const jugadores = snapshot.val();
-            if (jugadores) actualizarEstadoJugadores(jugadores);
-        });
+            // Listener para jugadores
+            const jugadoresRef = database.ref('salas/' + salaId + '/jugadores');
+            jugadoresRef.on('value', (snapshot) => {
+                const jugadores = snapshot.val();
+                if (jugadores) actualizarEstadoJugadores(jugadores);
+            });
 
-        // Iniciar lógica del juego
-        iniciarJuego();
+            // Iniciar lógica del juego
+            iniciarJuego();
+        });
       }
       
       // Update timer display
@@ -933,7 +1245,7 @@
         return fichasJugador.some(fichaId => tieneFichaMovimientosValidos(fichaId));
       }
       
-      // Verificar si hay un ganador
+      // Modificar la función verificarGanador
       function verificarGanador() {
         for (const combinacion of combinacionesGanadoras) {
           const pos1 = combinacion[0];
@@ -946,6 +1258,28 @@
             const jugador3 = tablero[pos3].split('-')[0];
             
             if (jugador1 === jugador2 && jugador2 === jugador3) {
+              const gameTime = 30 - timeLeft;
+              const moves = faseMover ? fichasColocadasJ1 + fichasColocadasJ2 : 3;
+              
+              if (!esEspectador) {
+                // Obtener UID del otro jugador
+                database.ref('salas/' + salaId + '/jugadores').once('value')
+                  .then(snapshot => {
+                    const jugadores = snapshot.val();
+                    const jugadorGanador = parseInt(jugador1);
+                    const uidGanador = jugadores[jugadorGanador].uid;
+                    const uidPerdedor = jugadores[jugadorGanador === 1 ? 2 : 1].uid;
+
+                    // Actualizar estadísticas del ganador
+                    updateUserStats(uidGanador, true, gameTime, moves);
+                    
+                    // Actualizar estadísticas del perdedor
+                    updateUserStats(uidPerdedor, false, gameTime, moves);
+                    
+                    // Actualizar tabla de ranking
+                    updateRankingTable();
+                  });
+              }
               return parseInt(jugador1);
             }
           }
@@ -1212,6 +1546,97 @@
             }, 2000);
           });
       });
+
+      // Manejar cierre/recarga de página
+      window.addEventListener('beforeunload', function() {
+        if (salaId) {
+            // Desconectar listeners
+            database.ref('salas/' + salaId + '/estado').off();
+            database.ref('salas/' + salaId + '/jugadores').off();
+            
+            // Si es jugador, marcar como desconectado y terminar la sala
+            if (jugadorNum === 1 || jugadorNum === 2) {
+                database.ref('salas/' + salaId + '/jugadores/' + jugadorNum + '/conectado').set(false);
+                database.ref('salas/' + salaId + '/estado/terminada').set(true);
+            }
+        }
+      });
+
+      // Funciones para estadísticas
+      function initializeUserStats(userId) {
+        database.ref('users/' + userId + '/stats').once('value')
+          .then(snapshot => {
+            if (!snapshot.exists()) {
+              return database.ref('users/' + userId + '/stats').set({
+                victories: 0,
+                defeats: 0,
+                totalMoves: 0,
+                totalTime: 0,
+                gamesPlayed: 0
+              });
+            }
+          });
+      }
+
+      // Modificar updateUserStats para manejar el tiempo del jugador actual
+      function updateUserStats(userId, isVictory, gameTime, moves) {
+        database.ref('users/' + userId + '/stats').transaction(stats => {
+          if (stats === null) stats = {};
+          
+          const playerTime = isVictory ? gameTime : (30 - gameTime); // El perdedor usó el tiempo restante
+          
+          stats.victories = (stats.victories || 0) + (isVictory ? 1 : 0);
+          stats.defeats = (stats.defeats || 0) + (isVictory ? 0 : 1);
+          stats.totalMoves = (stats.totalMoves || 0) + moves;
+          stats.totalTime = (stats.totalTime || 0) + playerTime;
+          stats.gamesPlayed = (stats.gamesPlayed || 0) + 1;
+          
+          return stats;
+        });
+      }
+
+      function loadUserStats(userId) {
+        database.ref('users/' + userId + '/stats').on('value', snapshot => {
+          const stats = snapshot.val() || {};
+          document.getElementById('stats-victories').textContent = stats.victories || 0;
+          document.getElementById('stats-defeats').textContent = stats.defeats || 0;
+          
+          // Calcular tiempo promedio solo con el tiempo real jugado
+          const avgTime = stats.gamesPlayed ? 
+            Math.round(stats.totalTime / (stats.victories + stats.defeats)) : 0;
+          document.getElementById('stats-avg-time').textContent = avgTime + 's';
+        });
+      }
+
+      function updateRankingTable() {
+        database.ref('users').orderByChild('stats/victories').limitToLast(10).once('value')
+          .then(snapshot => {
+            const users = [];
+            snapshot.forEach(child => {
+              users.push({
+                username: child.val().username,
+                stats: child.val().stats || {}
+              });
+            });
+
+            const tableBody = document.getElementById('ranking-table-body');
+            tableBody.innerHTML = '';
+            
+            users.reverse().forEach((user, index) => {
+              const ratio = user.stats.victories / (user.stats.gamesPlayed || 1);
+              const row = `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>${user.username}</td>
+                  <td>${user.stats.victories || 0}</td>
+                  <td>${user.stats.defeats || 0}</td>
+                  <td>${ratio.toFixed(2)}</td>
+                </tr>
+              `;
+              tableBody.innerHTML += row;
+            });
+          });
+      }
     });
   </script>
 </body>
